@@ -9,14 +9,7 @@ from .querysets import PostQuerySet
 User = get_user_model()
 
 
-class PublishedModel(models.Model):
-    """Абстракная модель с общими полями"""
-
-    is_published = models.BooleanField(
-        default=True,
-        verbose_name='Опубликовано',
-        help_text='Снимите галочку, чтобы скрыть публикацию.'
-    )
+class CreateAtModel(models.Model):
     created_at = models.DateTimeField(
         auto_now_add=True,
         verbose_name='Добавлено'
@@ -25,6 +18,19 @@ class PublishedModel(models.Model):
     class Meta:
         abstract = True
         ordering = ('-created_at',)
+
+
+class PublishedModel(CreateAtModel):
+    """Абстракная модель с опубликованными постами"""
+
+    is_published = models.BooleanField(
+        default=True,
+        verbose_name='Опубликовано',
+        help_text='Снимите галочку, чтобы скрыть публикацию.'
+    )
+
+    class Meta(CreateAtModel.Meta):
+        abstract = True
 
 
 class Category(PublishedModel):
@@ -39,7 +45,7 @@ class Category(PublishedModel):
         unique=True,
         verbose_name='Идентификатор',
         help_text='Идентификатор страницы для URL; разрешены символы латиницы,'
-        ' цифры, дефис и подчёркивание.'
+                  ' цифры, дефис и подчёркивание.'
     )
 
     class Meta(PublishedModel.Meta):
@@ -75,7 +81,7 @@ class Post(PublishedModel):
     pub_date = models.DateTimeField(
         verbose_name='Дата и время публикации',
         help_text='Если установить дату и время в будущем — '
-        'можно делать отложенные публикации.'
+                  'можно делать отложенные публикации.'
     )
     author = models.ForeignKey(
         User,
@@ -121,7 +127,8 @@ class Comment(models.Model):
         User,
         on_delete=models.CASCADE,
         null=True,
-        verbose_name='Автор комментария'
+        verbose_name='Автор комментария',
+        related_name='comments'
     )
     post = models.ForeignKey(
         Post,
