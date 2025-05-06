@@ -168,7 +168,6 @@ class CategoryPostsView(ListView):
         )
 
     def get_context_data(self, **kwargs):
-        """Добавляет категорию в контекст"""
         return dict(
             **super().get_context_data(**kwargs),
             category=self.get_category()
