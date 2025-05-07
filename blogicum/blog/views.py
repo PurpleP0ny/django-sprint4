@@ -5,7 +5,6 @@ from django.db.models import Count
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse, reverse_lazy
-from django.utils import timezone
 from django.views.generic import (CreateView, DeleteView, DetailView, ListView,
                                   UpdateView)
 
@@ -85,21 +84,10 @@ class PostDetailView(DetailView):
         return Post.objects.select_related('author', 'category', 'location')
 
     def get_object(self, queryset=None):
-        if queryset is None:
-            queryset = self.get_queryset()
-        try:
-            post = super().get_object(queryset)
-            if post.author == self.request.user:
-                return post
-        except Http404:
-            pass
-        return super().get_object(
-            queryset.filter(
-                is_published=True,
-                category__is_published=True,
-                pub_date__lte=timezone.now()
-            )
-        )
+        post = super().get_object()
+        if post.is_published or post.author == self.request.user:
+            return post
+        raise Http404('Данный пост не опубликован')
 
     def get_context_data(self, **kwargs):
         return dict(
@@ -124,17 +112,12 @@ class ProfileView(ListView):
     def get_queryset(self):
         profile_user = self.get_profile_user()
         queryset = profile_user.posts.annotate(
-            comment_count=Count('comments')
-        ).select_related(
-            'category', 'location'
+            comment_count=Count(
+                'comments')).select_related(
+                    'category', 'location'
         ).order_by('-pub_date')
         if self.request.user != profile_user:
-            queryset = queryset.filter(
-                is_published=True,
-                pub_date__lte=timezone.now(),
-                category__is_published=True
-            )
-
+            queryset = queryset.published()
         return queryset
 
     def get_context_data(self, **kwargs):
@@ -156,16 +139,9 @@ class CategoryPostsView(ListView):
         )
 
     def get_queryset(self):
-        return (
-            self.get_category().posts
-            .filter(
-                is_published=True,
-                pub_date__lte=timezone.now()
-            )
-            .select_related('author', 'location')
-            .annotate(comment_count=Count('comments'))
-            .order_by('-pub_date')
-        )
+        category = self.get_category()
+        return category.posts.published().with_related(
+        ).with_comments_count().order_by('-pub_date')
 
     def get_context_data(self, **kwargs):
         return dict(
