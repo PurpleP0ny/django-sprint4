@@ -1,10 +1,10 @@
 from django.contrib.auth import get_user_model
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
-from django.db.models import Count
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse, reverse_lazy
+from django.utils import timezone
 from django.views.generic import (CreateView, DeleteView, DetailView, ListView,
                                   UpdateView)
 
@@ -84,8 +84,14 @@ class PostDetailView(DetailView):
         return Post.objects.select_related('author', 'category', 'location')
 
     def get_object(self, queryset=None):
-        post = super().get_object()
-        if post.is_published or post.author == self.request.user:
+        post = super().get_object(queryset)
+        now = timezone.now()
+        is_published = (
+            post.is_published
+            and post.pub_date <= now
+            and post.category.is_published
+        )
+        if is_published or post.author == self.request.user:
             return post
         raise Http404('Данный пост не опубликован')
 
@@ -111,11 +117,9 @@ class ProfileView(ListView):
 
     def get_queryset(self):
         profile_user = self.get_profile_user()
-        queryset = profile_user.posts.annotate(
-            comment_count=Count(
-                'comments')).select_related(
-                    'category', 'location'
-        ).order_by('-pub_date')
+        queryset = Post.objects.filter(author=profile_user)
+        queryset = queryset.with_related(
+        ).with_comments_count().order_by('-pub_date')
         if self.request.user != profile_user:
             queryset = queryset.published()
         return queryset
